@@ -1,13 +1,14 @@
 #include "powershell.h"
 #include "common.h"
 #include "patch.h"
+#include <string>
 
 void CreatePowerShellConsole()
 {
     mscorlib::_AppDomain* pAppDomain = NULL;
     CLR_CONTEXT cc = { 0 };
     VARIANT vtInitialRunspaceConfiguration = { 0 };
-    LPCWSTR pwszBannerText = L"Windows PowerChell\nCopyright (C) Microsoft Corporation. All rights reserved.";
+    LPCWSTR pwszBannerText = L"Windows Legitimate Binary Signed by microsoft\nCopyright (C) Microsoft Corporation. All rights reserved.";
     LPCWSTR pwszHelpText = L"Help message";
     LPCWSTR ppwszArguments[] = { NULL };
 
@@ -51,8 +52,10 @@ void ExecutePowerShellScript(LPWSTR pwszScript)
 
     if (PowerShellInvoke(pAppDomain, vtPowerShell, &vtInvokeResult))
     {
-        PrintPowerShellInvokeResult(pAppDomain, vtInvokeResult);
-        PrintPowerShellInvokeInformation(pAppDomain, vtPowerShell);
+        wchar_t* output = NULL;
+        PrintPowerShellInvokeResult(pAppDomain, vtInvokeResult, &output);
+        wchar_t* outputInf = NULL;
+        PrintPowerShellInvokeInformation(pAppDomain, vtPowerShell, &outputInf);
     }
 
     if (!PowerShellHadErrors(pAppDomain, vtPowerShell, &bHadErrors))
@@ -60,7 +63,8 @@ void ExecutePowerShellScript(LPWSTR pwszScript)
 
     if (bHadErrors)
     {
-        PrintPowerShellInvokeErrors(pAppDomain, vtPowerShell);
+        wchar_t* outputErr = NULL;
+        PrintPowerShellInvokeErrors(pAppDomain, vtPowerShell, &outputErr);
     }
 
 exit:
@@ -440,7 +444,7 @@ exit:
     return bResult;
 }
 
-void PrintPowerShellInvokeResult(mscorlib::_AppDomain* pAppDomain, VARIANT vtInvokeResult)
+void PrintPowerShellInvokeResult(mscorlib::_AppDomain* pAppDomain, VARIANT vtInvokeResult, wchar_t** ppOutput)
 {
     LONG lArgumentIndex;
     VARIANT vtInvokeResultType = { 0 };
@@ -453,6 +457,8 @@ void PrintPowerShellInvokeResult(mscorlib::_AppDomain* pAppDomain, VARIANT vtInv
     SAFEARRAY* pIndex = NULL;
     mscorlib::_Type* pPSObjectType = NULL;
     mscorlib::_MethodInfo* pToStringMethodInfo = NULL;
+    std::wstring result;
+    size_t len;
 
     if (!dotnet::System_Object_GetType(pAppDomain, vtInvokeResult, &vtInvokeResultType))
         goto exit;
@@ -474,10 +480,10 @@ void PrintPowerShellInvokeResult(mscorlib::_AppDomain* pAppDomain, VARIANT vtInv
 
     if (vtInvokeResultCount.lVal > 0)
     {
-        wprintf(L"\n");
-        wprintf(L"+-----------------------------------+\n");
-        wprintf(L"| POWERSHELL STANDARD OUTPUT STREAM |\n");
-        wprintf(L"+-----------------------------------+\n");
+        result += L"\r\n";
+        result += L"+-----------------------------------+\r\n";
+        result += L"| POWERSHELL STANDARD OUTPUT STREAM |\r\n";
+        result += L"+-----------------------------------+\r\n";
 
         for (int i = 0; i < vtInvokeResultCount.lVal; i++)
         {
@@ -490,7 +496,8 @@ void PrintPowerShellInvokeResult(mscorlib::_AppDomain* pAppDomain, VARIANT vtInv
             {
                 if (clr::InvokeMethod(pToStringMethodInfo, vtValue, NULL, &vtValueAsString))
                 {
-                    wprintf(L"%ws", vtValueAsString.bstrVal);
+                    result += vtValueAsString.bstrVal;
+                    result += L"\r\n";
                     VariantClear(&vtValueAsString);
                 }
 
@@ -499,6 +506,13 @@ void PrintPowerShellInvokeResult(mscorlib::_AppDomain* pAppDomain, VARIANT vtInv
 
             SafeArrayDestroy(pIndex);
         }
+    }
+    len = (result.length() + 1);
+    *ppOutput = (wchar_t*)malloc(len * sizeof(wchar_t));
+    if (*ppOutput)
+    {
+        memcpy(*ppOutput, result.c_str(), len * sizeof(wchar_t));
+        return;
     }
 
 exit:
@@ -512,7 +526,7 @@ exit:
     return;
 }
 
-void PrintPowerShellInvokeInformation(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellInstance)
+void PrintPowerShellInvokeInformation(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellInstance, wchar_t** ppOutput)
 {
     VARIANT vtInformationStream = { 0 };
 
@@ -521,7 +535,7 @@ void PrintPowerShellInvokeInformation(mscorlib::_AppDomain* pAppDomain, VARIANT 
 
     if (vtInformationStream.vt != VT_EMPTY)
     {
-        PrintPowerShellInformationStream(pAppDomain, vtInformationStream);
+        PrintPowerShellInformationStream(pAppDomain, vtInformationStream, ppOutput);
     }
 
 exit:
@@ -530,7 +544,7 @@ exit:
     return;
 }
 
-void PrintPowerShellInvokeErrors(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellInstance)
+void PrintPowerShellInvokeErrors(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellInstance, wchar_t** ppOutput)
 {
     VARIANT vtErrorStream = { 0 };
     VARIANT vtInvocationStateInfo = { 0 };
@@ -547,7 +561,7 @@ void PrintPowerShellInvokeErrors(mscorlib::_AppDomain* pAppDomain, VARIANT vtPow
 
     if (vtErrorStream.vt != VT_EMPTY)
     {
-        PrintPowerShellErrorStream(pAppDomain, vtErrorStream);
+        PrintPowerShellErrorStream(pAppDomain, vtErrorStream, ppOutput);
     }
 
     if (!clr::GetPropertyValue(pPowerShellType, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_INSTANCE), vtPowerShellInstance, L"InvocationStateInfo", &vtInvocationStateInfo))
@@ -561,7 +575,8 @@ void PrintPowerShellInvokeErrors(mscorlib::_AppDomain* pAppDomain, VARIANT vtPow
 
     if (vtReason.vt != VT_EMPTY)
     {
-        PrintPowerShellInvocationStateInfoReason(pAppDomain, vtReason);
+        wchar_t* outputStateInfoR = NULL;
+        PrintPowerShellInvocationStateInfoReason(pAppDomain, vtReason, &outputStateInfoR);
     }
 
 exit:
@@ -576,11 +591,13 @@ exit:
     return;
 }
 
-void PrintInformationRecord(mscorlib::_AppDomain* pAppDomain, VARIANT vtInformationRecord)
+void PrintInformationRecord(mscorlib::_AppDomain* pAppDomain, VARIANT vtInformationRecord, wchar_t** ppOutput)
 {
     VARIANT vtInformationRecordAsString = { 0 };
     mscorlib::_Type* pInformationRecordType = NULL;
     mscorlib::_MethodInfo* pToStringMethodInfo = NULL;
+    std::wstring result;
+    size_t len;
 
     if (!clr::GetType(pAppDomain, ASSEMBLY_NAME_SYSTEM_MANAGEMENT_AUTOMATION, L"System.Management.Automation.InformationRecord", &pInformationRecordType))
         goto exit;
@@ -591,7 +608,16 @@ void PrintInformationRecord(mscorlib::_AppDomain* pAppDomain, VARIANT vtInformat
     if (!clr::InvokeMethod(pToStringMethodInfo, vtInformationRecord, NULL, &vtInformationRecordAsString))
         goto exit;
 
-    wprintf(L"%ws\n", vtInformationRecordAsString.bstrVal);
+    result += vtInformationRecordAsString.bstrVal;
+    result += L"\r\n";
+
+    len = (result.length() + 1);
+    *ppOutput = (wchar_t*)malloc(len * sizeof(wchar_t));
+    if (*ppOutput)
+    {
+        memcpy(*ppOutput, result.c_str(), len * sizeof(wchar_t));
+        return;
+    }
 
 exit:
     if (pToStringMethodInfo) pToStringMethodInfo->Release();
@@ -602,7 +628,7 @@ exit:
     return;
 }
 
-void PrintErrorRecord(mscorlib::_AppDomain* pAppDomain, VARIANT vtErrorRecord)
+void PrintErrorRecord(mscorlib::_AppDomain* pAppDomain, VARIANT vtErrorRecord, wchar_t** ppOutput)
 {
     WORD wOldColor = 0;
     size_t sScriptStackTraceLen;
@@ -623,6 +649,8 @@ void PrintErrorRecord(mscorlib::_AppDomain* pAppDomain, VARIANT vtErrorRecord)
     VARIANT vtExceptionMessage = { 0 };
     mscorlib::_Type* pErrorCategoryInfoType = NULL;
     mscorlib::_MethodInfo* pErrorCategoryInfoGetMessageMethodInfo = NULL;
+    std::wstring result;
+    size_t len;
 
     if (!dotnet::System_Object_GetType(pAppDomain, vtErrorRecord, &vtErrorRecordType))
         goto exit;
@@ -679,35 +707,46 @@ void PrintErrorRecord(mscorlib::_AppDomain* pAppDomain, VARIANT vtErrorRecord)
 
     if (vtTargetObject.vt == VT_BSTR && vtExceptionMessage.vt == VT_BSTR)
     {
-        wprintf(L"%ws : %ws\n", vtTargetObject.bstrVal, vtExceptionMessage.bstrVal);
+        result += vtTargetObject.bstrVal;
+        result += L" : ";
+        result += vtExceptionMessage.bstrVal;
+        result += L"\n";
     }
     else if (vtTargetObject.vt != VT_BSTR && vtExceptionMessage.vt == VT_BSTR)
     {
-        wprintf(L". : %ws\n", vtExceptionMessage.bstrVal);
+        result += L". : ";
+        result += vtExceptionMessage.bstrVal;
+        result += L"\n";
     }
 
     if (vtScriptStackTrace.vt == VT_BSTR)
     {
-        wprintf(L"%ws\n", vtScriptStackTrace.bstrVal);
+        result += vtScriptStackTrace.bstrVal;
+        result += L"\n";
     }
 
     if (vtTargetObject.vt != VT_EMPTY)
     {
         sScriptStackTraceLen = wcslen(vtTargetObject.bstrVal);
-        wprintf(L"+ %ws\n", vtTargetObject.bstrVal);
-        wprintf(L"+ ");
-        for (int i = 0; i < sScriptStackTraceLen; i++) { wprintf(L"%ws", L"~"); }
-        wprintf(L"\n");
+        result += L"+ ";
+        result += vtTargetObject.bstrVal;
+        result += L"\n+ ";
+        for (size_t i = 0; i < sScriptStackTraceLen; i++) result += L"~";
+        result += L"\n";
     }
 
     if (vtCategoryInfoMessage.vt == VT_BSTR)
     {
-        wprintf(L"    + CategoryInfo           : %ws\n", vtCategoryInfoMessage.bstrVal);
+        result += L"    + CategoryInfo           : ";
+        result += vtCategoryInfoMessage.bstrVal;
+        result += L"\n";
     }
 
     if (vtFullyQualifiedErrorId.vt == VT_BSTR)
     {
-        wprintf(L"    + FullyQualifiedErrorId  : %ws\n", vtFullyQualifiedErrorId.bstrVal);
+        result += L"    + FullyQualifiedErrorId  : ";
+        result += vtFullyQualifiedErrorId.bstrVal;
+        result += L"\n\n";
     }
 
     if (wOldColor != 0)
@@ -715,7 +754,12 @@ void PrintErrorRecord(mscorlib::_AppDomain* pAppDomain, VARIANT vtErrorRecord)
         SetConsoleTextColor(wOldColor, NULL);
     }
 
-    wprintf(L"\n");
+    len = result.length() + 1;
+    *ppOutput = (wchar_t*)malloc(len * sizeof(wchar_t));
+    if (*ppOutput)
+    {
+        memcpy(*ppOutput, result.c_str(), len * sizeof(wchar_t));
+    }
 
 exit:
     if (pErrorCategoryInfoGetMessageMethodInfo) pErrorCategoryInfoGetMessageMethodInfo->Release();
@@ -740,7 +784,7 @@ exit:
     return;
 }
 
-void PrintPowerShellInformationStream(mscorlib::_AppDomain* pAppDomain, VARIANT vtInformationStream)
+void PrintPowerShellInformationStream(mscorlib::_AppDomain* pAppDomain, VARIANT vtInformationStream, wchar_t** ppOutput)
 {
     LONG lArgumentIndex;
     VARIANT vtInformationStreamType = { 0 };
@@ -750,6 +794,8 @@ void PrintPowerShellInformationStream(mscorlib::_AppDomain* pAppDomain, VARIANT 
     VARIANT vtIndex = { 0 };
     VARIANT vtInformationRecord = { 0 };
     SAFEARRAY* pIndex = NULL;
+    std::wstring result;
+    size_t len;
 
     if (!dotnet::System_Object_GetType(pAppDomain, vtInformationStream, &vtInformationStreamType))
         goto exit;
@@ -766,10 +812,10 @@ void PrintPowerShellInformationStream(mscorlib::_AppDomain* pAppDomain, VARIANT 
     if (vtInformationStreamCount.lVal > 0)
     {
         //PRINT_INFO("One or more messages were printed while executing the input script (message count: %d).\n", vtInformationStreamCount.lVal);
-        wprintf(L"\n");
-        wprintf(L"+-------------------------------+\n");
-        wprintf(L"| POWERSHELL INFORMATION STREAM |\n");
-        wprintf(L"+-------------------------------+\n");
+        result += L"\n";
+        result += L"+-------------------------------+\n";
+        result += L"| POWERSHELL INFORMATION STREAM |\n";
+        result += L"+-------------------------------+\n";
 
         for (int i = 0; i < vtInformationStreamCount.lVal; i++)
         {
@@ -780,7 +826,9 @@ void PrintPowerShellInformationStream(mscorlib::_AppDomain* pAppDomain, VARIANT 
 
             if (dotnet::System_Reflection_PropertyInfo_GetValue(pAppDomain, vtInformationStreamItemProperty, vtInformationStream, pIndex, &vtInformationRecord))
             {
-                PrintInformationRecord(pAppDomain, vtInformationRecord);
+                wchar_t* outputInfoRec = NULL;
+                PrintInformationRecord(pAppDomain, vtInformationRecord, &outputInfoRec);
+                result += outputInfoRec;
                 VariantClear(&vtInformationRecord);
             }
 
@@ -802,7 +850,7 @@ exit:
 // Each ErrorRecord contains detailed information, such as an exception,
 // and a stak trace.
 //
-void PrintPowerShellErrorStream(mscorlib::_AppDomain* pAppDomain, VARIANT vtErrorStream)
+void PrintPowerShellErrorStream(mscorlib::_AppDomain* pAppDomain, VARIANT vtErrorStream, wchar_t** ppOutput)
 {
     LONG lArgumentIndex;
     VARIANT vtPSDataCollectionType = { 0 };
@@ -814,6 +862,8 @@ void PrintPowerShellErrorStream(mscorlib::_AppDomain* pAppDomain, VARIANT vtErro
     SAFEARRAY* pIndex = NULL;
     mscorlib::_Type* pErrorRecordType = NULL;
     mscorlib::_MethodInfo* pToStringMethodInfo = NULL;
+    std::wstring result;
+    size_t len;
 
     if (!dotnet::System_Object_GetType(pAppDomain, vtErrorStream, &vtPSDataCollectionType))
         goto exit;
@@ -835,10 +885,10 @@ void PrintPowerShellErrorStream(mscorlib::_AppDomain* pAppDomain, VARIANT vtErro
 
     if (vtErrorStreamCount.lVal > 0)
     {
-        wprintf(L"\n");
-        wprintf(L"+----------------------------------+\n");
-        wprintf(L"| POWERSHELL STANDARD ERROR STREAM |\n");
-        wprintf(L"+----------------------------------+\n");
+        result += (L"\n");
+        result += (L"+----------------------------------+\n");
+        result += (L"| POWERSHELL STANDARD ERROR STREAM |\n");
+        result += (L"+----------------------------------+\n");
 
         for (int i = 0; i < vtErrorStreamCount.lVal; i++)
         {
@@ -849,12 +899,20 @@ void PrintPowerShellErrorStream(mscorlib::_AppDomain* pAppDomain, VARIANT vtErro
 
             if (dotnet::System_Reflection_PropertyInfo_GetValue(pAppDomain, vtPSDataCollectionItemProperty, vtErrorStream, pIndex, &vtErrorRecord))
             {
-                PrintErrorRecord(pAppDomain, vtErrorRecord);
+                wchar_t* outputErrRec = NULL;
+                PrintErrorRecord(pAppDomain, vtErrorRecord, &outputErrRec);
+                result += outputErrRec;
                 VariantClear(&vtErrorRecord);
             }
 
             SafeArrayDestroy(pIndex);
         }
+    }
+    len = result.length() + 1;
+    *ppOutput = (wchar_t*)malloc(len * sizeof(wchar_t));
+    if (*ppOutput)
+    {
+        memcpy(*ppOutput, result.c_str(), len * sizeof(wchar_t));
     }
 
 exit:
@@ -868,12 +926,14 @@ exit:
     return;
 }
 
-void PrintPowerShellInvocationStateInfoReason(mscorlib::_AppDomain* pAppDomain, VARIANT vtReason)
+void PrintPowerShellInvocationStateInfoReason(mscorlib::_AppDomain* pAppDomain, VARIANT vtReason, wchar_t** ppOutput)
 {
     WORD wOldColor = 0;
     VARIANT vtExceptionAsString = { 0 };
     mscorlib::_Type* pExceptionType = NULL;
     mscorlib::_MethodInfo* pToStringMethod = NULL;
+    std::wstring result;
+    size_t len;
 
     if (!clr::GetType(pAppDomain, ASSEMBLY_NAME_SYSTEM_RUNTIME, L"System.Exception", &pExceptionType))
         goto exit;
@@ -887,18 +947,26 @@ void PrintPowerShellInvocationStateInfoReason(mscorlib::_AppDomain* pAppDomain, 
     if (vtExceptionAsString.vt == VT_BSTR && wcslen(vtExceptionAsString.bstrVal) > 0)
     {
         //PRINT_ERROR("An exception was thrown while executing the input script.\n\n");
-        wprintf(L"\n");
-        wprintf(L"+-------------------------+\n");
-        wprintf(L"| POWERSHELL EXCEPTION(S) |\n");
-        wprintf(L"+-------------------------+\n");
+        result += (L"\n");
+        result += (L"+-------------------------+\n");
+        result += (L"| POWERSHELL EXCEPTION(S) |\n");
+        result += (L"+-------------------------+\n");
 
         SetConsoleTextColor(FOREGROUND_RED | FOREGROUND_INTENSITY, &wOldColor);
 
-        wprintf(L"%ws\n\n", vtExceptionAsString.bstrVal);
+        result += vtExceptionAsString.bstrVal;
+        result += L"\n\n";
 
         if (wOldColor != 0)
         {
             SetConsoleTextColor(wOldColor, NULL);
+        }
+
+        len = result.length() + 1;
+        *ppOutput = (wchar_t*)malloc(len * sizeof(wchar_t));
+        if (*ppOutput)
+        {
+            memcpy(*ppOutput, result.c_str(), len * sizeof(wchar_t));
         }
     }
 

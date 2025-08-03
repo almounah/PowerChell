@@ -1,0 +1,25 @@
+LIBRARY "powershell"
+EXPORTS
+    CreatePowerShellConsole
+    ExecutePowerShellScript
+    DisablePowerShellEtwProvider
+    PatchAllTheThings
+    CreateInitialRunspaceConfiguration
+    StartConsoleShell
+    PowerShellCreate
+    PowerShellDispose
+    PowerShellAddScript
+    PowerShellAddCommand
+    PowerShellInvoke
+    PowerShellGetStream
+    PowerShellHadErrors
+    PrintPowerShellInvokeResult
+    PrintPowerShellInvokeInformation
+    PrintPowerShellInvokeErrors
+    PrintInformationRecord
+    PrintErrorRecord
+    PrintPowerShellInformationStream
+    PrintPowerShellErrorStream
+    PrintPowerShellInvocationStateInfoReason
+    SetConsoleTextColor
+
