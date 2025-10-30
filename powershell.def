@@ -6,6 +6,7 @@ EXPORTS
     PatchAllTheThings
     CreateInitialRunspaceConfiguration
     GetJustInTimeMethodAddress
+    GetJustInTimeMethodAddressEx
     StartConsoleShell
     PowerShellCreate
     PowerShellDispose

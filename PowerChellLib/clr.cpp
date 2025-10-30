@@ -580,6 +580,77 @@ exit:
     return bResult;
 }
 
+BOOL clr::GetJustInTimeMethodAddressEx(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssemblyName, LPCWSTR pwszClassName, LPCWSTR pwszMethodName, PDWORD pdwNbArgs, PULONG_PTR pMethodAddress)
+{
+    DWORD dwNbArgs = *pdwNbArgs;
+    BOOL bResult = FALSE;
+    VARIANT vtMethodHandlePtr = { 0 };
+    VARIANT vtMethodHandleVal = { 0 };
+    mscorlib::_Type* pType = NULL;
+    mscorlib::_Type* pMethodInfoType = NULL;
+    mscorlib::_MethodInfo* pTargetMethodInfo = NULL;
+
+    // Here, we include as many binding flags as we can so that we can list
+    // ALL the methods of the target class.
+    mscorlib::BindingFlags flags = static_cast<mscorlib::BindingFlags>(
+        mscorlib::BindingFlags::BindingFlags_Instance |
+        mscorlib::BindingFlags::BindingFlags_Static |
+        mscorlib::BindingFlags::BindingFlags_Public |
+        mscorlib::BindingFlags::BindingFlags_NonPublic |
+        mscorlib::BindingFlags::BindingFlags_DeclaredOnly
+        );
+
+    if (!clr::GetType(pAppDomain, pwszAssemblyName, pwszClassName, &pType))
+        goto exit;
+
+    if (!clr::GetMethod(pType, flags, pwszMethodName, dwNbArgs, &pTargetMethodInfo))
+        goto exit;
+
+    //
+    // The method for obtaining the MethodHandle from the MethodInfo object is
+    // taken from this article.
+    // 
+    // Credit:
+    //   - https://www.outflank.nl/blog/2024/02/01/unmanaged-dotnet-patching/
+    //
+
+    if (!clr::GetType(pAppDomain, ASSEMBLY_NAME_SYSTEM_REFLECTION, L"System.Reflection.MethodInfo", &pMethodInfoType))
+        goto exit;
+
+    vtMethodHandlePtr.vt = VT_UNKNOWN;
+    vtMethodHandlePtr.punkVal = pTargetMethodInfo;
+
+    if (!clr::GetPropertyValue(pMethodInfoType, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_INSTANCE), vtMethodHandlePtr, L"MethodHandle", &vtMethodHandleVal))
+        goto exit;
+
+    //
+    // Next, we can invoke 'RuntimeHelpers.PrepareMethod' to make sure the target
+    // method is JIT-compiled, and finally get its effective address.
+    //
+    // Credit:
+    //   - https://github.com/calebstewart/bypass-clm
+    //   - https://www.mdsec.co.uk/2020/08/massaging-your-clr-preventing-environment-exit-in-in-process-net-assemblies/
+    //
+
+    if (!PrepareMethod(pAppDomain, &vtMethodHandleVal))
+        goto exit;
+
+    if (!GetFunctionPointer(pAppDomain, &vtMethodHandleVal, pMethodAddress))
+        goto exit;
+
+    bResult = TRUE;
+
+exit:
+    if (pTargetMethodInfo) pTargetMethodInfo->Release();
+    if (pType) pType->Release();
+    if (pMethodInfoType) pMethodInfoType->Release();
+
+    VariantClear(&vtMethodHandleVal);
+    VariantClear(&vtMethodHandlePtr);
+
+    return bResult;
+}
+
 BOOL dotnet::System_Object_GetType(mscorlib::_AppDomain* pAppDomain, VARIANT vtObject, VARIANT* pvtObjectType)
 {
     BOOL bResult = FALSE;

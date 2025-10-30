@@ -34,6 +34,7 @@ typedef struct _CLR_CONTEXT
 
 namespace clr
 {
+    BOOL GetJustInTimeMethodAddressEx(mscorlib::_AppDomain* pAppDomain, LPCWSTR pwszAssemblyName, LPCWSTR pwszClassName, LPCWSTR pwszMethodName, PDWORD pdwNbArgs, PULONG_PTR pMethodAddress);
     BOOL InitializeCommonLanguageRuntime(PCLR_CONTEXT pClrContext, mscorlib::_AppDomain** ppAppDomain);
     void DestroyCommonLanguageRuntime(PCLR_CONTEXT pClrContext, mscorlib::_AppDomain* pAppDomain);
     BOOL FindAssemblyPath(LPCWSTR pwszAssemblyName, LPWSTR* ppwszAssemblyPath);
