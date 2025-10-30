@@ -398,6 +398,7 @@ BOOL PowerShellClearErrors(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShel
     VARIANT vtEmpty = { 0 };
     VARIANT vtErrors = { 0 };
     VARIANT vtStreams = { 0 };
+    VARIANT vtResult = { 0 };
     mscorlib::_Type* pPowerShellType = NULL;
     mscorlib::_MethodInfo* pClearMethodInfo = NULL;
 
@@ -415,7 +416,7 @@ BOOL PowerShellClearErrors(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShel
         goto exit;
 
     // Get the 'Clear' method from PSCommand
-    if (!clr::GetMethod(vtErrors, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_INSTANCE), L"Clear", 0, &pClearMethodInfo))
+    if (!clr::GetMethod(pPowerShellType, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_INSTANCE), L"ClearStreams", 0, &pClearMethodInfo))
         goto exit;
 
     // Invoke the Clear method
@@ -427,7 +428,6 @@ BOOL PowerShellClearErrors(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShel
 exit:
     // Cleanup
     if (pClearMethodInfo) pClearMethodInfo->Release();
-    if (pPSCommandType) pPSCommandType->Release();
     if (pPowerShellType) pPowerShellType->Release();
     VariantClear(&vtCommands);
     VariantClear(&vtErrors);
