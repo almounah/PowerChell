@@ -5,6 +5,7 @@ EXPORTS
     DisablePowerShellEtwProvider
     PatchAllTheThings
     CreateInitialRunspaceConfiguration
+    GetJustInTimeMethodAddress
     StartConsoleShell
     PowerShellCreate
     PowerShellDispose
@@ -12,6 +13,7 @@ EXPORTS
     PowerShellAddCommand
     PowerShellInvoke
     PowerShellClear
+    PowerShellClearErrors
     PowerShellGetStream
     PowerShellHadErrors
     PrintPowerShellInvokeResult

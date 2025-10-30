@@ -16,6 +16,7 @@ BOOL PowerShellAddScript(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellI
 BOOL PowerShellAddCommand(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellInstance, LPCWSTR pwszCommand);
 BOOL PowerShellInvoke(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellInstance, VARIANT* pvtInvokeResult);
 BOOL PowerShellClear(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellInstance, VARIANT* pvtInvokeResult);
+BOOL PowerShellClearErrors(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellInstance, VARIANT* pvtInvokeResult);
 BOOL PowerShellGetStream(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellInstance, LPCWSTR pwszStreamName, VARIANT* pvtStream);
 BOOL PowerShellHadErrors(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellInstance, PBOOL pbHadErrors);
 

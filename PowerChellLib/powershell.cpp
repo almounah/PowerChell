@@ -391,6 +391,51 @@ exit:
     return bResult;
 }
 
+BOOL PowerShellClearErrors(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellInstance)
+{
+    BOOL bResult = FALSE;
+    VARIANT vtCommands = { 0 };
+    VARIANT vtEmpty = { 0 };
+    VARIANT vtErrors = { 0 };
+    VARIANT vtStreams = { 0 };
+    mscorlib::_Type* pPowerShellType = NULL;
+    mscorlib::_MethodInfo* pClearMethodInfo = NULL;
+
+    // Get the PowerShell type
+    if (!clr::GetType(pAppDomain, ASSEMBLY_NAME_SYSTEM_MANAGEMENT_AUTOMATION, L"System.Management.Automation.PowerShell", &pPowerShellType))
+        goto exit;
+
+    // Get Streams
+    if (!clr::GetPropertyValue(pPowerShellType, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_INSTANCE), vtPowerShellInstance, L"Streams", &vtStreams))
+        goto exit;
+
+    // Get the Error
+    if (!clr::GetPropertyValue(NULL, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_INSTANCE), vtStreams, L"Error", &vtErrors))
+    goto exit;
+        goto exit;
+
+    // Get the 'Clear' method from PSCommand
+    if (!clr::GetMethod(vtErrors, static_cast<mscorlib::BindingFlags>(BINDING_FLAGS_PUBLIC_INSTANCE), L"Clear", 0, &pClearMethodInfo))
+        goto exit;
+
+    // Invoke the Clear method
+    if (!clr::InvokeMethod(pClearMethodInfo, vtCommands, NULL, &vtResult))
+        goto exit;
+
+    bResult = TRUE;
+
+exit:
+    // Cleanup
+    if (pClearMethodInfo) pClearMethodInfo->Release();
+    if (pPSCommandType) pPSCommandType->Release();
+    if (pPowerShellType) pPowerShellType->Release();
+    VariantClear(&vtCommands);
+    VariantClear(&vtErrors);
+
+    return bResult;
+}
+
+
 BOOL PowerShellClear(mscorlib::_AppDomain* pAppDomain, VARIANT vtPowerShellInstance)
 {
     BOOL bResult = FALSE;
